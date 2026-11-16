@@ -1,5 +1,5 @@
 const $=(s)=>document.querySelector(s);
-const login=$('#login'),app=$('#app'),form=$('#loginForm'),password=$('#password'),loginError=$('#loginError'),logout=$('#logout'),requestBox=$('#request'),run=$('#run'),status=$('#status'),output=$('#output'),recent=$('#recent');
+const login=$('#login'),app=$('#app'),form=$('#loginForm'),password=$('#password'),loginError=$('#loginError'),logout=$('#logout'),requestBox=$('#request'),run=$('#run'),status=$('#status'),output=$('#output'),recent=$('#recent'),liveFrame=$('#liveFrame'),liveEmpty=$('#liveEmpty'),liveStep=$('#liveStep'),liveTime=$('#liveTime'),liveUrl=$('#liveUrl');
 let timer;
 
 async function api(path,options={}){
@@ -13,6 +13,20 @@ function show(ok){login.hidden=ok;app.hidden=!ok}
 
 function render(t){
   status.textContent=t.status;
+  if(t.live?.frame){
+    liveFrame.src=t.live.frame;
+    liveFrame.hidden=false;
+    liveEmpty.hidden=true;
+    liveStep.textContent=`Bước ${t.live.step}/${t.live.total} · ${t.live.action}`;
+    liveTime.textContent=t.live.capturedAt?new Date(t.live.capturedAt).toLocaleTimeString('vi-VN'):'—';
+    liveUrl.textContent=t.live.url||'—';
+  }else{
+    liveFrame.hidden=true;
+    liveEmpty.hidden=false;
+    liveStep.textContent=t.status==='running'?'Đang chờ frame đầu tiên…':'Chưa có hình ảnh trực tiếp';
+    liveTime.textContent='—';
+    liveUrl.textContent='—';
+  }
   const l=[`Yêu cầu:\n${t.request}`,'',`Trạng thái: ${t.status}`];
   if(t.plan?.actions?.length)l.push('','Kế hoạch:',...t.plan.actions.map((a,i)=>`${i+1}. ${JSON.stringify(a)}`));
   if(t.logs?.length)l.push('','Log:',...t.logs.map(e=>`${e.message}${e.detail?' — '+e.detail:''}`));
@@ -42,7 +56,7 @@ async function watch(id){
   const poll=async()=>{
     const t=await api(`/api/tasks/${id}`);
     render(t);
-    if(['queued','running'].includes(t.status))timer=setTimeout(poll,1200);
+    if(['queued','running'].includes(t.status))timer=setTimeout(poll,900);
     else loadRecent();
   };
   await poll();

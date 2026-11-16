@@ -23,6 +23,15 @@ button{min-height:44px;border:1px solid var(--border);border-radius:var(--rs);pa
 button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
 .actions{margin-top:14px}
 .activity{margin-top:20px}
+.live-panel{margin-top:18px;padding:18px}
+.live-head{align-items:flex-end;margin-bottom:12px}
+.live-head .brand{margin-bottom:5px}
+.live-head h2{margin:0;font-size:16px}
+#liveTime{color:var(--muted);font-family:var(--mono);font-size:12px}
+.live-stage{aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden;background:#080b0f;border:1px solid var(--border);border-radius:var(--rs)}
+.live-stage img{width:100%;height:100%;object-fit:contain;display:block}
+.live-empty{padding:28px;color:var(--muted);text-align:center;line-height:1.6}
+.live-url{margin:10px 0 0;color:var(--muted);font-family:var(--mono);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .activity pre{min-height:150px;max-height:360px;overflow:auto;color:var(--muted);font-family:var(--mono);font-size:12px;line-height:1.6;white-space:pre-wrap}
 .task{width:100%;text-align:left;background:var(--surface2);color:var(--text);margin-bottom:8px;padding:10px;height:auto}
 .task small{display:block;color:var(--muted);margin-top:4px}

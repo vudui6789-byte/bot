@@ -30,12 +30,28 @@ async function completeTask(id, payload) {
   });
 }
 
+async function updateTaskProgress(id, payload) {
+  try {
+    await agentFetch(`/api/agent/tasks/${id}/progress`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    console.warn(`[${id}] live progress lỗi: ${error.message}`);
+  }
+}
+
 async function runTask(task) {
   const logs = [];
   try {
     const plan = buildPlan(task.request);
     logs.push({ at: new Date().toISOString(), message: 'Đã phân tích yêu cầu', detail: `${plan.actions.length} thao tác` });
-    const outputs = await runBrowserPlan(plan.actions, (entry) => logs.push(entry));
+    await updateTaskProgress(task.id, { logs, live: null });
+    const outputs = await runBrowserPlan(
+      plan.actions,
+      (entry) => logs.push(entry),
+      async (live) => updateTaskProgress(task.id, { logs, live })
+    );
     await completeTask(task.id, { status: 'completed', plan, logs, outputs, error: null });
     console.log(`[${task.id}] completed`);
   } catch (error) {

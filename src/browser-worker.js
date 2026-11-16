@@ -10,7 +10,24 @@ function logLine(onLog, message, detail = null) {
   onLog({ at: new Date().toISOString(), message, detail });
 }
 
-export async function runBrowserPlan(actions, onLog) {
+async function emitLiveProgress(page, onProgress, step, total, action) {
+  if (!onProgress) return;
+  let buffer = null;
+  for (const quality of [45, 30, 20]) {
+    buffer = await page.screenshot({ type: 'jpeg', quality, fullPage: false });
+    if (buffer.length <= 60_000) break;
+  }
+  await onProgress({
+    step,
+    total,
+    action: action.type,
+    url: page.url(),
+    capturedAt: new Date().toISOString(),
+    frame: `data:image/jpeg;base64,${buffer.toString('base64')}`
+  });
+}
+
+export async function runBrowserPlan(actions, onLog, onProgress = null) {
   if (actions.length > policy.maxActionsPerTask) {
     throw new Error(`Task vượt quá ${policy.maxActionsPerTask} thao tác.`);
   }
@@ -60,21 +77,25 @@ export async function runBrowserPlan(actions, onLog) {
         assertAllowedUrl(action.url);
         await page.goto(action.url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         outputs.push({ type: 'url', value: page.url() });
+        await emitLiveProgress(page, onProgress, index + 1, actions.length, action);
         continue;
       }
 
       if (action.type === 'clickText') {
         await page.getByText(action.text, { exact: true }).first().click({ timeout: 15_000 });
+        await emitLiveProgress(page, onProgress, index + 1, actions.length, action);
         continue;
       }
 
       if (action.type === 'fillLabel') {
         await page.getByLabel(action.label, { exact: false }).first().fill(action.value);
+        await emitLiveProgress(page, onProgress, index + 1, actions.length, action);
         continue;
       }
 
       if (action.type === 'selectLabel') {
         await page.getByLabel(action.label, { exact: false }).first().selectOption({ label: action.value });
+        await emitLiveProgress(page, onProgress, index + 1, actions.length, action);
         continue;
       }
 
@@ -87,6 +108,7 @@ export async function runBrowserPlan(actions, onLog) {
         await download.saveAs(destination);
         outputs.push({ type: 'download', value: destination });
         logLine(onLog, 'Đã tải file', destination);
+        await emitLiveProgress(page, onProgress, index + 1, actions.length, action);
         continue;
       }
 
@@ -94,11 +116,13 @@ export async function runBrowserPlan(actions, onLog) {
         const filePath = assertAllowedUploadPath(action.filePath);
         await page.locator(action.selector).setInputFiles(filePath);
         logLine(onLog, 'Đã chọn file để upload', filePath);
+        await emitLiveProgress(page, onProgress, index + 1, actions.length, action);
         continue;
       }
 
       if (action.type === 'waitForText') {
         await page.getByText(action.text, { exact: false }).first().waitFor({ state: 'visible', timeout: 30_000 });
+        await emitLiveProgress(page, onProgress, index + 1, actions.length, action);
         continue;
       }
 
@@ -107,6 +131,7 @@ export async function runBrowserPlan(actions, onLog) {
         await page.screenshot({ path: destination, fullPage: true });
         outputs.push({ type: 'screenshot', value: destination });
         logLine(onLog, 'Đã chụp ảnh', destination);
+        await emitLiveProgress(page, onProgress, index + 1, actions.length, action);
         continue;
       }
 

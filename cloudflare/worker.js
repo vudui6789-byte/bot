@@ -67,7 +67,7 @@ export class TaskStore extends DurableObject {
   async createTask(requestText) {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    const task = { id, request: requestText, status: 'queued', plan: null, logs: [], outputs: [], error: null, createdAt: now, updatedAt: now, claimedAt: null };
+    const task = { id, request: requestText, status: 'queued', plan: null, logs: [], outputs: [], error: null, live: null, createdAt: now, updatedAt: now, claimedAt: null };
     const index = await this.storage.get(TASK_INDEX_KEY) || [];
     const nextIndex = [id, ...index.filter((value) => value !== id)].slice(0, MAX_STORED_TASKS);
     await this.storage.put({ [taskKey(id)]: task, [TASK_INDEX_KEY]: nextIndex });
@@ -79,7 +79,10 @@ export class TaskStore extends DurableObject {
     const ids = index.slice(0, Math.max(1, Math.min(Number(limit) || 20, 50)));
     if (!ids.length) return [];
     const values = await this.storage.get(ids.map(taskKey));
-    return ids.map((id) => values.get(taskKey(id))).filter(Boolean);
+    return ids.map((id) => values.get(taskKey(id))).filter(Boolean).map((task) => ({
+      ...task,
+      live: task.live ? { ...task.live, frame: null } : null
+    }));
   }
 
   async getTask(id) {
@@ -114,6 +117,19 @@ export class TaskStore extends DurableObject {
     await this.storage.put(taskKey(id), updated);
     return true;
   }
+
+  async updateProgress(id, payload) {
+    const task = await this.storage.get(taskKey(id));
+    if (!task) return false;
+    const updated = {
+      ...task,
+      logs: Array.isArray(payload.logs) ? payload.logs : task.logs,
+      live: payload.live === null ? task.live : (payload.live || task.live),
+      updatedAt: new Date().toISOString()
+    };
+    await this.storage.put(taskKey(id), updated);
+    return true;
+  }
 }
 
 function taskStore(env) {
@@ -137,6 +153,12 @@ async function api(request, env, url) {
   if (url.pathname.startsWith('/api/agent/')) {
     if (!agentAuthenticated(request, env)) return respond({ error: 'Agent token không hợp lệ.' }, 401);
     const store = taskStore(env);
+    const progressMatch = url.pathname.match(/^\/api\/agent\/tasks\/([^/]+)\/progress$/);
+    if (progressMatch && request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      const updated = await store.updateProgress(progressMatch[1], body);
+      return updated ? respond({ ok: true }) : respond({ error: 'Không tìm thấy task.' }, 404);
+    }
     if (url.pathname === '/api/agent/next' && request.method === 'POST') {
       const task = await store.claimNext();
       return task ? respond(task) : new Response(null, { status: 204 });
