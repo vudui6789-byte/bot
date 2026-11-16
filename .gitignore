@@ -3,3 +3,4 @@ runtime/
 .env
 .env.agent
 *.log
+.wrangler-alt/

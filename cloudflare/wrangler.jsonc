@@ -1,6 +1,6 @@
 {
-  "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "company-automation-bot",
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "bot",
   "main": "worker.js",
   "compatibility_date": "2026-11-16",
   "assets": {
@@ -8,12 +8,18 @@
     "binding": "ASSETS",
     "run_worker_first": true
   },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "company-automation-bot-db",
-      "database_id": "b8becabc-4c62-4cf8-ab57-53b3cc38fdcd",
-      "migrations_dir": "migrations"
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TASK_STORE",
+        "class_name": "TaskStore"
+      }
+    ]
+  },
+  "exports": {
+    "TaskStore": {
+      "type": "durable-object",
+      "storage": "sqlite"
     }
-  ]
+  }
 }

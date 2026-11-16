@@ -57,6 +57,10 @@ Scheduled Task chạy trong phiên người dùng nên Edge có thể hiển th�
 
 Cloudflare Worker public nằm trong `cloudflare/`. Windows agent kết nối outbound HTTPS tới Cloudflare, lấy task và chạy Edge tại máy Windows.
 
+Cloud control-plane dùng SQLite-backed Durable Object (`TaskStore`) nên không cần D1 `database_id`. Repo có `wrangler.jsonc` ngay ở root để Cloudflare Git integration chạy trực tiếp bằng `npx wrangler deploy` trên bất kỳ account nào.
+
+Khi nối repository với Cloudflare account mới, Worker và Durable Object sẽ được tạo trong chính account đó mà không phải sửa ID tài nguyên.
+
 Chạy agent:
 
 ```powershell

@@ -8,7 +8,12 @@
     "start": "node server.js",
     "dev": "node server.js",
     "agent": "node --env-file=.env.agent src/cloud-agent.js",
+    "deploy": "wrangler deploy",
+    "preview:cloud": "wrangler dev",
     "check": "node --check server.js && node --check src/policy.js && node --check src/planner.js && node --check src/browser-worker.js && node --check src/cloud-agent.js && node --check cloudflare/worker.js"
+  },
+  "devDependencies": {
+    "wrangler": "4.163.0"
   },
   "dependencies": {
     "express": "^5.3.0",

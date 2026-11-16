@@ -1,5 +1,9 @@
+import { DurableObject } from 'cloudflare:workers';
+
 const SESSION_COOKIE = 'company_bot_session';
 const SESSION_TTL = 43200;
+const TASK_INDEX_KEY = 'task-index';
+const MAX_STORED_TASKS = 200;
 
 function respond(data, status = 200, extra = {}) {
   return new Response(JSON.stringify(data), {
@@ -10,9 +14,9 @@ function respond(data, status = 200, extra = {}) {
 
 function cookies(request) {
   const raw = request.headers.get('cookie') || '';
-  return Object.fromEntries(raw.split(';').map((v) => v.trim()).filter(Boolean).map((v) => {
-    const i = v.indexOf('=');
-    return i < 0 ? [v, ''] : [v.slice(0, i), v.slice(i + 1)];
+  return Object.fromEntries(raw.split(';').map((value) => value.trim()).filter(Boolean).map((value) => {
+    const index = value.indexOf('=');
+    return index < 0 ? [value, ''] : [value.slice(0, index), value.slice(index + 1)];
   }));
 }
 
@@ -28,14 +32,14 @@ async function sign(secret, value) {
     false,
     ['sign']
   );
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
-  return base64url(new Uint8Array(sig));
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
+  return base64url(new Uint8Array(signature));
 }
 
 async function createSession(secret) {
-  secret = String(secret || '').trim();
+  const normalizedSecret = String(secret || '').trim();
   const expiry = String(Math.floor(Date.now() / 1000) + SESSION_TTL);
-  return `${expiry}.${await sign(secret, expiry)}`;
+  return `${expiry}.${await sign(normalizedSecret, expiry)}`;
 }
 
 async function authenticated(request, env) {
@@ -50,18 +54,70 @@ function agentAuthenticated(request, env) {
   return request.headers.get('authorization') === `Bearer ${String(env.AGENT_TOKEN || '').trim()}`;
 }
 
-function rowToTask(row) {
-  return {
-    id: row.id,
-    request: row.request,
-    status: row.status,
-    plan: row.plan_json ? JSON.parse(row.plan_json) : null,
-    logs: JSON.parse(row.logs_json || '[]'),
-    outputs: JSON.parse(row.outputs_json || '[]'),
-    error: row.error,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
+function taskKey(id) {
+  return `task:${id}`;
+}
+
+export class TaskStore extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.storage = ctx.storage;
+  }
+
+  async createTask(requestText) {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const task = { id, request: requestText, status: 'queued', plan: null, logs: [], outputs: [], error: null, createdAt: now, updatedAt: now, claimedAt: null };
+    const index = await this.storage.get(TASK_INDEX_KEY) || [];
+    const nextIndex = [id, ...index.filter((value) => value !== id)].slice(0, MAX_STORED_TASKS);
+    await this.storage.put({ [taskKey(id)]: task, [TASK_INDEX_KEY]: nextIndex });
+    return task;
+  }
+
+  async listTasks(limit = 20) {
+    const index = await this.storage.get(TASK_INDEX_KEY) || [];
+    const ids = index.slice(0, Math.max(1, Math.min(Number(limit) || 20, 50)));
+    if (!ids.length) return [];
+    const values = await this.storage.get(ids.map(taskKey));
+    return ids.map((id) => values.get(taskKey(id))).filter(Boolean);
+  }
+
+  async getTask(id) {
+    return await this.storage.get(taskKey(id)) || null;
+  }
+
+  async claimNext() {
+    const index = await this.storage.get(TASK_INDEX_KEY) || [];
+    for (const id of [...index].reverse()) {
+      const task = await this.storage.get(taskKey(id));
+      if (!task || task.status !== 'queued') continue;
+      const now = new Date().toISOString();
+      const claimed = { ...task, status: 'running', claimedAt: now, updatedAt: now };
+      await this.storage.put(taskKey(id), claimed);
+      return { id: claimed.id, request: claimed.request };
+    }
+    return null;
+  }
+
+  async completeTask(id, payload) {
+    const task = await this.storage.get(taskKey(id));
+    if (!task) return false;
+    const updated = {
+      ...task,
+      status: payload.status,
+      plan: payload.plan || null,
+      logs: Array.isArray(payload.logs) ? payload.logs : [],
+      outputs: Array.isArray(payload.outputs) ? payload.outputs : [],
+      error: payload.error || null,
+      updatedAt: new Date().toISOString()
+    };
+    await this.storage.put(taskKey(id), updated);
+    return true;
+  }
+}
+
+function taskStore(env) {
+  return env.TASK_STORE.getByName('company-bot-global');
 }
 
 async function api(request, env, url) {
@@ -71,58 +127,26 @@ async function api(request, env, url) {
       return respond({ error: 'Mật khẩu không đúng.' }, 401);
     }
     const session = await createSession(env.SESSION_SECRET);
-    return respond(
-      { ok: true },
-      200,
-      { 'set-cookie': `${SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL}` }
-    );
+    return respond({ ok: true }, 200, { 'set-cookie': `${SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL}` });
   }
 
   if (url.pathname === '/api/logout' && request.method === 'POST') {
-    return respond(
-      { ok: true },
-      200,
-      { 'set-cookie': `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0` }
-    );
+    return respond({ ok: true }, 200, { 'set-cookie': `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0` });
   }
 
   if (url.pathname.startsWith('/api/agent/')) {
     if (!agentAuthenticated(request, env)) return respond({ error: 'Agent token không hợp lệ.' }, 401);
-
+    const store = taskStore(env);
     if (url.pathname === '/api/agent/next' && request.method === 'POST') {
-      const candidate = await env.DB
-        .prepare("SELECT id, request FROM tasks WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1")
-        .first();
-      if (!candidate) return new Response(null, { status: 204 });
-      const now = new Date().toISOString();
-      const claim = await env.DB
-        .prepare("UPDATE tasks SET status = 'running', claimed_at = ?, updated_at = ? WHERE id = ? AND status = 'queued'")
-        .bind(now, now, candidate.id)
-        .run();
-      if (!claim.meta?.changes) return new Response(null, { status: 204 });
-      return respond(candidate);
+      const task = await store.claimNext();
+      return task ? respond(task) : new Response(null, { status: 204 });
     }
-
     const completeMatch = url.pathname.match(/^\/api\/agent\/tasks\/([^/]+)\/complete$/);
     if (completeMatch && request.method === 'POST') {
       const body = await request.json().catch(() => ({}));
-      if (!['completed', 'failed'].includes(body.status)) {
-        return respond({ error: 'Trạng thái không hợp lệ.' }, 400);
-      }
-      const now = new Date().toISOString();
-      await env.DB
-        .prepare('UPDATE tasks SET status = ?, plan_json = ?, logs_json = ?, outputs_json = ?, error = ?, updated_at = ? WHERE id = ?')
-        .bind(
-          body.status,
-          body.plan ? JSON.stringify(body.plan) : null,
-          JSON.stringify(body.logs || []),
-          JSON.stringify(body.outputs || []),
-          body.error || null,
-          now,
-          completeMatch[1]
-        )
-        .run();
-      return respond({ ok: true });
+      if (!['completed', 'failed'].includes(body.status)) return respond({ error: 'Trạng thái không hợp lệ.' }, 400);
+      const updated = await store.completeTask(completeMatch[1], body);
+      return updated ? respond({ ok: true }) : respond({ error: 'Không tìm thấy task.' }, 404);
     }
     return respond({ error: 'Agent endpoint không tồn tại.' }, 404);
   }
@@ -130,29 +154,23 @@ async function api(request, env, url) {
   const ok = await authenticated(request, env);
   if (url.pathname === '/api/me') return respond({ authenticated: ok });
   if (!ok) return respond({ error: 'Bạn cần đăng nhập.' }, 401);
+  const store = taskStore(env);
 
   if (url.pathname === '/api/tasks' && request.method === 'POST') {
     const body = await request.json().catch(() => ({}));
-    const text = String(body.request || '').trim();
-    if (!text || text.length > 10000) return respond({ error: 'Yêu cầu trống hoặc quá dài.' }, 400);
-    const id = crypto.randomUUID();
-    const now = new Date().toISOString();
-    await env.DB
-      .prepare('INSERT INTO tasks (id, request, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(id, text, 'queued', now, now)
-      .run();
-    return respond({ id, request: text, status: 'queued' }, 202);
+    const requestText = String(body.request || '').trim();
+    if (!requestText || requestText.length > 10000) return respond({ error: 'Yêu cầu trống hoặc quá dài.' }, 400);
+    return respond(await store.createTask(requestText), 202);
   }
 
   if (url.pathname === '/api/tasks' && request.method === 'GET') {
-    const { results } = await env.DB.prepare('SELECT * FROM tasks ORDER BY created_at DESC LIMIT 20').all();
-    return respond({ tasks: results.map(rowToTask) });
+    return respond({ tasks: await store.listTasks(20) });
   }
 
   const taskMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)$/);
   if (taskMatch && request.method === 'GET') {
-    const row = await env.DB.prepare('SELECT * FROM tasks WHERE id = ?').bind(taskMatch[1]).first();
-    return row ? respond(rowToTask(row)) : respond({ error: 'Không tìm thấy task.' }, 404);
+    const task = await store.getTask(taskMatch[1]);
+    return task ? respond(task) : respond({ error: 'Không tìm thấy task.' }, 404);
   }
   return respond({ error: 'API không tồn tại.' }, 404);
 }
