@@ -137,6 +137,15 @@ async function api(request, env, url) {
   if (url.pathname.startsWith('/api/agent/')) {
     if (!agentAuthenticated(request, env)) return respond({ error: 'Agent token không hợp lệ.' }, 401);
     const store = taskStore(env);
+    if (url.pathname === '/api/agent/diagnostic' && request.method === 'POST') {
+      const task = await store.createTask('mo https://analytics.aoing.workers.dev/\nscreenshot');
+      return respond({ id: task.id, status: task.status }, 202);
+    }
+    const diagnosticMatch = url.pathname.match(/^\/api\/agent\/diagnostic\/([^/]+)$/);
+    if (diagnosticMatch && request.method === 'GET') {
+      const task = await store.getTask(diagnosticMatch[1]);
+      return task ? respond(task) : respond({ error: 'Không tìm thấy task.' }, 404);
+    }
     if (url.pathname === '/api/agent/next' && request.method === 'POST') {
       const task = await store.claimNext();
       return task ? respond(task) : new Response(null, { status: 204 });
