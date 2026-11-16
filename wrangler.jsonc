@@ -3,6 +3,7 @@
   "name": "bot",
   "main": "cloudflare/worker.js",
   "compatibility_date": "2026-11-16",
+  "keep_vars": true,
   "assets": {
     "directory": "./cloudflare/public",
     "binding": "ASSETS",

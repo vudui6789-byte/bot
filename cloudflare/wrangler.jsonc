@@ -3,6 +3,7 @@
   "name": "bot",
   "main": "worker.js",
   "compatibility_date": "2026-11-16",
+  "keep_vars": true,
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
