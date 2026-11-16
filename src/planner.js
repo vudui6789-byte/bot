@@ -4,6 +4,14 @@ function cleanLine(line) {
   return line.trim().replace(/^[-*]\s*/, '');
 }
 
+function cleanValue(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/[.。]+$/g, '')
+    .trim();
+}
+
 export function buildPlan(requestText) {
   const lines = requestText
     .split(/\r?\n/)
@@ -12,13 +20,46 @@ export function buildPlan(requestText) {
 
   const actions = [];
   const ignored = [];
+  let contextLabel = null;
 
   for (const line of lines) {
     let match;
 
+    match = line.match(/^(?:ở|o|tại|tai)\s+["']([^"']+)["']\s*$/i);
+    if (match) {
+      contextLabel = cleanValue(match[1]);
+      continue;
+    }
+
     match = line.match(/^(?:mở|mo|truy cập|truy cap|vào|vao)\s+(https?:\/\/\S+)$/i);
     if (match) {
       actions.push({ type: 'goto', url: match[1] });
+      continue;
+    }
+
+    match = line.match(/^(?:nhập|nhap|điền|dien)\s+([^:]+)\s*:\s*(.+?)\s+(?:và|va|rồi|roi)\s+(?:ấn|an|bấm|bam|click)\s+(.+)$/i);
+    if (match) {
+      actions.push({ type: 'fillLabel', value: cleanValue(match[2]), label: cleanValue(match[1]) });
+      actions.push({ type: 'clickText', text: cleanValue(match[3]) });
+      continue;
+    }
+
+    match = line.match(/^(?:nhập|nhap|điền|dien)\s+([^:]+)\s*:\s*(.+)$/i);
+    if (match) {
+      actions.push({ type: 'fillLabel', value: cleanValue(match[2]), label: cleanValue(match[1]) });
+      continue;
+    }
+
+    match = line.match(/^(?:chọn|chon)\s+(?:bản|ban)\s+(.+?)\s+(?:rồi|roi)\s+(?:chọn|chon|ấn|an|bấm|bam|click)\s+(.+)$/i);
+    if (match && contextLabel) {
+      actions.push({ type: 'selectLabel', value: cleanValue(match[1]), label: contextLabel });
+      actions.push({ type: 'clickText', text: cleanValue(match[2]) });
+      continue;
+    }
+
+    match = line.match(/^(?:chọn|chon)\s+(?:bản|ban)\s+(.+)$/i);
+    if (match && contextLabel) {
+      actions.push({ type: 'selectLabel', value: cleanValue(match[1]), label: contextLabel });
       continue;
     }
 

@@ -82,7 +82,12 @@ export async function runBrowserPlan(actions, onLog, onProgress = null) {
       }
 
       if (action.type === 'clickText') {
-        await page.getByText(action.text, { exact: true }).first().click({ timeout: 15_000 });
+        const button = page.getByRole('button', { name: action.text, exact: false }).first();
+        if (await button.count()) {
+          await button.click({ timeout: 15_000 });
+        } else {
+          await page.getByText(action.text, { exact: false }).first().click({ timeout: 15_000 });
+        }
         await emitLiveProgress(page, onProgress, index + 1, actions.length, action);
         continue;
       }
