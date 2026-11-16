@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Company Bot Cloud</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section id="login" class="panel login" hidden>
+      <p class="brand">Company Bot Cloud</p>
+      <h1>Điều khiển automation từ máy công ty.</h1>
+      <p class="muted">Đăng nhập để gửi tác vụ đến Windows agent.</p>
+      <form id="loginForm">
+        <label for="password">Mật khẩu</label>
+        <input id="password" type="password" required autocomplete="current-password">
+        <button class="primary">Đăng nhập</button>
+      </form>
+      <p id="loginError" class="error"></p>
+    </section>
+
+    <section id="app" hidden>
+      <header>
+        <div>
+          <p class="brand">Company Bot Cloud</p>
+          <h1>Giao việc cho Windows agent.</h1>
+        </div>
+        <button id="logout" class="secondary">Đăng xuất</button>
+      </header>
+
+      <div class="grid">
+        <section class="panel composer">
+          <label for="request">Yêu cầu</label>
+          <textarea id="request" placeholder='mở http://127.0.0.1:4317&#10;chụp ảnh'></textarea>
+          <div class="actions">
+            <button id="run" class="primary">Gửi tác vụ</button>
+          </div>
+          <p class="muted">Cloudflare giữ task và log. Edge vẫn chạy trên máy Windows có agent.</p>
+        </section>
+        <aside class="panel">
+          <h2>Task gần đây</h2>
+          <div id="recent">Đang tải…</div>
+        </aside>
+      </div>
+
+      <section class="activity">
+        <div class="row">
+          <h2>Tiến trình</h2>
+          <span id="status">Chưa chạy</span>
+        </div>
+        <pre id="output">Gửi một task để bắt đầu.</pre>
+      </section>
+    </section>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

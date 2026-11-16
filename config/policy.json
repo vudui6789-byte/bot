@@ -1,0 +1,20 @@
+{
+  "host": "127.0.0.1",
+  "port": 4317,
+  "browser": {
+    "executablePath": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "headless": false
+  },
+  "allowedDomains": [
+    "localhost",
+    "127.0.0.1",
+    "analytics.aoing.workers.dev"
+  ],
+  "allowedUploadFolders": [
+    "./runtime/downloads",
+    "./runtime/uploads"
+  ],
+  "downloadFolder": "./runtime/downloads",
+  "screenshotFolder": "./runtime/screenshots",
+  "maxActionsPerTask": 30
+}

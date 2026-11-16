@@ -1,0 +1,17 @@
+{
+  "name": "company-automation-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local internal browser and file automation workbench",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "agent": "node --env-file=.env.agent src/cloud-agent.js",
+    "check": "node --check server.js && node --check src/policy.js && node --check src/planner.js && node --check src/browser-worker.js && node --check src/cloud-agent.js && node --check cloudflare/worker.js"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "playwright-core": "^1.65.1"
+  }
+}

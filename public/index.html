@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Company Bot</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="product-name">Company Bot</p>
+        <h1>Giao việc cho trình duyệt.</h1>
+      </div>
+      <div class="health" id="health">Đang kiểm tra máy…</div>
+    </header>
+
+    <section class="workspace" aria-label="Automation workbench">
+      <div class="composer">
+        <label for="request">Yêu cầu</label>
+        <textarea id="request" spellcheck="false" placeholder='mở https://portal.company.local&#10;nhập "SC5T" vào "Line"&#10;tải file khi bấm "Export"&#10;chụp ảnh'></textarea>
+        <div class="actions">
+          <button class="secondary" id="previewButton" type="button">Xem kế hoạch</button>
+          <button class="primary" id="runButton" type="button">Chạy tác vụ</button>
+        </div>
+        <p class="hint">Mỗi thao tác một dòng. Bot chỉ truy cập domain và file đã được Admin cho phép.</p>
+      </div>
+
+      <aside class="rail">
+        <section class="rail-section">
+          <h2>Quyền hiện tại</h2>
+          <div id="policy" class="policy-list">Đang tải…</div>
+        </section>
+        <section class="rail-section">
+          <h2>Cú pháp nhanh</h2>
+          <code>mở https://…</code>
+          <code>bấm "Tên nút"</code>
+          <code>nhập "Giá trị" vào "Nhãn"</code>
+          <code>tải file khi bấm "Export"</code>
+        </section>
+      </aside>
+    </section>
+
+    <section class="activity" aria-live="polite">
+      <div class="activity-head">
+        <h2>Tiến trình</h2>
+        <span id="taskStatus">Chưa chạy</span>
+      </div>
+      <pre id="output">Kế hoạch và log sẽ xuất hiện ở đây.</pre>
+    </section>
+  </main>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
