@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "company-automation-bot-db",
-      "database_id": "b8becabc-4c62-4cf8-ab57-53b3cc38fdcd",
+      "database_id": "3494d80b-3e77-40da-ab15-f699e9c3ca77",
       "migrations_dir": "migrations"
     }
   ]
